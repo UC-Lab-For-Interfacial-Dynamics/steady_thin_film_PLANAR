@@ -1,11 +1,15 @@
 % Liquid Density Function
-% Reads polyfit coefficients from 'fluidData.mat' and returns liquid
-% density as a function of the input temperature.
+%       Curvefit from the global variable 'F.rhov_fit' and 'F.rhol_fit' are needed.
 % Ayaaz Yasin - Sep 11, 2024
-% rho = density(T)
+%
+%       [rhov, rhol] = density(T)
+%
+% Input:    T ............ Temperature [K]
+% Outputs:  rhov ......... vapor density [kg/m^3]
+%           thol ......... liquid density [kg/m^3]
 
-function rho = density(T)
-global F
-% load('fluidData.mat', 'rhol_fit')    % loads polyfit coefficients for density
-rho = polyval(F.rhol_fit, T);          % calculate rho at given temperature(s)
+function [rhov, rhol] = density(T)
+    global F
+    rhov = polyval(F.rhov_fit, T);   % calculate vapor rho at given temperature(s)
+    rhol = polyval(F.rhol_fit, T);   % calculate liquid rho at given temperature(s)
 end

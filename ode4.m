@@ -1,5 +1,15 @@
 % Runge-Kutta Order-4 solver function (multi-dimensional)
-% MATH 8010 - Advanced Numerical Analysis
+%       Fixed-step 4th-order Runge-Kutta solver. This function can handle
+%       ODEs of order>1. If dydt=y', then y=y. 
+%       If dydt=[y',y'',y'''], then y=[y,y',y''].
+%       Unlike a standard ODE solver, this function:
+%           (1) Calls the derivative function with three inputs
+%               dydt(t, y, step) where step is 'false' for k1, k2, k3, but
+%               'true' for k4. This lets the derivative function know when
+%               it is being called at actual solution step and data can be
+%               saved for post-processing.
+%           (2) Stopping conditions check for invalid and complex solutions
+%               as well as, the first derivative becoming zero or positive.
 % Ayaaz Yasin - Feb 10, 2023
 %
 %       [t,y] = ode4(dydt,tSpan,y0,h)
@@ -15,27 +25,33 @@
 
 function [t,y] = ode4(dydt,tSpan,y0,h)
 
-% t = tSpan(1):h:tSpan(2);    % time domain
-t = tSpan(1);
+t = tSpan(1);               % starting point
 y = y0;                     % intialization
 
 for n = 1:length(tSpan(1):h:tSpan(2))-1
+    % Intermediate steps for the RK solver
     k1 = dydt(t(:,n),            y(:,n),            false);
     k2 = dydt((t(:,n)+h/2),     (y(:,n)+(h/2)*k1),  false);
     k3 = dydt((t(:,n)+h/2),     (y(:,n)+(h/2)*k2),  false);
     k4 = dydt((t(:,n)+h)  ,     (y(:,n)+h*k3),      true);
-
-    y(:,n+1) = y(:,n) + (h/6)*(k1+2*k2+2*k3+k4);
     
+    % Integration
+    y(:,n+1) = y(:,n) + (h/6)*(k1+2*k2+2*k3+k4);
     t(n+1) = t(n)+h;
-
-    % figure(1); plot(t(n),y(1,n),'r.'); hold on; drawnow();
-    % xlabel('wall distance [m]'); ylabel('film height [m]')
-
-    if isnan(y(1,end));     fprintf('solution is nan!\n');      break; end  % invalid solution
-    if y(2,end)>=0;         fprintf('film is flat!\n');         break; end  % flat film
-    if ~isreal(y(:,end));   fprintf('solution is not real!\n'); break; end  % solution is complex
-    % if y(3,end)<0;          fprintf('concave down!\n');         break; end  % film concave down 
-
+    
+    % Stopping Conditions
+    if isnan(y(1,end))                      % invalid solution
+        fprintf('Solution terminated!\nFilm height became invalid (nan) at x = %0.2f nm', t(end)*1e9);      
+        break; 
+    end  
+    if ~isreal(y(:,end))                    % solution is complex
+        fprintf('Solution terminated!\nFilm height or derivatives became non-real at x = %0.2f nm\n', t(end)*1e9); 
+        break; 
+    end  
+    if y(2,end)>=0                          % film is flat
+        fprintf('Solution terminated! \nFilm became flat at x = %0.2f nm.\n', t(end)*1e9);         
+        break; 
+    end  
 end
+
 end

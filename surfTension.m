@@ -1,13 +1,13 @@
-% Surface Tension Function
-% Reads polyfit coefficients from 'fluidData.mat' and returns surface
-% tension and surface tension gradient as a function of the input 
-% temperature.
+% Liquid Density Function
+%       Value of surface tension is currently set to a negative constant from 
+%       the MD data. Uses curvefit from NIST data to find the surface tension 
+%       gradient with temperature (ds/dT).
 % Ayaaz Yasin - Sep 11, 2024
-% [sigma, gamma] = surfTension(T)
+%       [sigma, gamma] = surfTension(T)
 
 function [sigma, gamma] = surfTension(T)
-global F
-% load('fluidData.mat', 'sigma_fit')    % loads polyfit coefficients for surface tension
-sigma = polyval(F.sigma_fit, T);        % calculate sigma at given temperature(s)
-gamma = F.sigma_fit(1);                 % surface tension gradient
+    global F
+    % sigma = polyval(F.sigma_fit, T);   % uncomment to calculate sigma using NIST curvefit at given temperature(s)
+    sigma = -3.7e-3;                   % [N/m], surf tension from MD data
+    gamma = F.sigma_fit(1);            % surface tension gradient
 end
