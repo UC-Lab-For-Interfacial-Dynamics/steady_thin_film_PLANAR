@@ -19,7 +19,8 @@ global F C R            % global data sharing. F-fluid properties, C-constants, 
 
 %%% Constants, Setup, and Input Parameters
 C.debug   = 'off';                  % when 'on', plots inner loop iterations & prints ODE solution at every step.
-C.Rc      = 8.31446261815324;       % [J/mol-K],    universal gas constant                       
+C.Rc      = 8.31446261815324;       % [J/mol-K],    universal gas constant
+C.Lz      = 3.92e-9;                % depth of MD domain [m]
 C.Tv_func = @Tv_func_MD_centerline; % vapor temperature function handle
 C.Tw_func = @Tw_func_MD;            % wall temperature function handle
 
@@ -27,9 +28,10 @@ C.Tw_func = @Tw_func_MD;            % wall temperature function handle
 h         = 3.958795862223173e-09;  % [m],          film height (currently from MD)
 h1        = -5.3153720543601342;    % [-],          first derivative (currently from MD)
 h2        = 45.2055317858027195e09; % [m^-1],       second derivative (currently from MD)
+R.G       = 2.0646e-14;             % [kg/s],       inlet mass flow rate
 IC        = [h,h1,h2];              % [-],          initial conditions vector
 C.x_in    = 0.06e-9;                % [m],          initial wall distance
-C.L       = 2.2e-9;                 % [m],          length of solution
+C.L       = 2.3e-9;                 % [m],          length of solution
 C.dx      = 1e-12;                  % [m],          step size
 
 %%% Initialize report vectors
@@ -43,46 +45,53 @@ R.kappa    = curvature(h1,h2);      % curvature vector
 R.Pc       = surfTension(R.Ti)*R.kappa;   % capillary pressure vector
 R.Pd       = disjoinPressure(h);    % disjoining pressure vector
 R.a        = nan;                   % accommodation coefficient vector
+R.mflow    = 0;                     % evaporation mass flow vector
+R.pdGrad   = nan;                   % disjoining pressure gradient vector
+R.plGrad   = nan;                   % liquid pressure gradient vector
+R.stGrad   = nan;                   % surface tension gradient vector
+R.h        = h;                     % film height vector
+R.surfArea = 0;                     % cummulative surface area
+R.totMflow = 0;                     % cummulative phase change mass flow
 
 
 %% ODE solution
-[X, H] = ode4(@(X, H, step) evolution(X, H, step), [C.x_in, C.x_in+C.L], IC', C.dx);
+[X, H] = ode4(@(X, H, step) evolution(X, H, step), [C.x_in, C.L], IC', C.dx);
 H = H'; % transposing for standard indexing
 
 %% Post-Processing
 %%% converting mass flux to mass flow
 
 mflow = massIntegration(X, H(:,1), R.mflux);
-fprintf('Total phase change mass flux %0.4e kg/s\n', mflow)
+fprintf('Total phase change mass flux %0.4e kg/s\t\t%0.4e kg/s\n', mflow, sum(R.mflow))
 
 %%% plots
 close all;
-fig=figure; fig.Position=[3,205,1917,668];
-rmv = 0;           % number of points to remove from the end of the solution in the plots. Useful is the solution blows up.
+fig=figure; fig.Position=[3,50,1917,946];
+rmv = 2;        % number of points to remove from the end of the solution in the plots. Useful if the solution blows up.
 
-subplot(2,4,1); % film height
+subplot(3,4,1); % film height
 plot(X(1:end-rmv)*1e10, H(1:end-rmv,1)*1e10, 'r.-', 'LineWidth',1.5, 'markersize',10); hold on;
 plot(X(1:end-rmv)*1e10, film(X(1:end-rmv))*1e10, 'k--', 'LineWidth',1.5);
 xlabel('length along wall (x) [A]'); ylabel('film height (h) [A]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.YAxis(1).Exponent=0; ax.XAxis(1).Exponent=0; axis padded;
 legend('ODE solution','MD','location','best')
 
-subplot(2,4,2); % first derivative
+subplot(3,4,2); % first derivative
 plot(X(1:end-rmv)*1e10, H(1:end-rmv,2), '.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
 xlabel('length along wall (x) [A]'); ylabel('first derivative (h1) [-]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,3); % second derivative
+subplot(3,4,3); % second derivative
 plot(X(1:end-rmv)*1e10, H(1:end-rmv,3), '.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
-xlabel('length along wall (x) [A]'); ylabel('second derivative (h2) [1/m]');
+xlabel('length along wall (x) [A]'); ylabel('second deriv (h2) [1/m]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,4); % third derviative
+subplot(3,4,4); % third derviative
 plot(X(1:end-rmv)*1e10, R.h3(1:end-rmv), '.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
 xlabel('length along wall (x) [A]'); ylabel('third derivative (h3) [1/m^2]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,5); % mass flux & accommodation coefficient
+subplot(3,4,5); % mass flux & accommodation coefficient
 yyaxis left 
     plot(X(1:end-rmv)*1e10, R.mflux(1:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10);
     ylabel('mass flux [kg/m^2-s]');
@@ -92,22 +101,44 @@ yyaxis right
 xlabel('length along wall (x) [A]'); 
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,6); % interface temperature
+subplot(3,4,6); % interface temperature
 plot(X(1:end-rmv)*1e10, R.Ti(1:end-rmv),'r.-', 'LineWidth',1.5, 'MarkerSize',10); hold on
+plot(X(1:end-rmv)*1e10, Ti_func_MD(X(1:end-rmv)),'r--', 'LineWidth',1);
 plot(X(1:end-rmv)*1e10, R.Tw(1:end-rmv),'k.-', 'LineWidth',1.5, 'MarkerSize',10);
 plot(X(1:end-rmv)*1e10, R.Tv(1:end-rmv),'b.-', 'LineWidth',1.5, 'MarkerSize',10);
-legend('interface','wall','vapor','Location','best')
+legend('interface','interface MD','wall','vapor','Location','best')
 xlabel('length along wall (x) [A]'); ylabel('temp [K]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,7); % curvature
+subplot(3,4,7); % curvature
 plot(X(1:end-rmv)*1e10, R.kappa(1:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
 xlabel('length along wall (x) [A]'); ylabel('curvature [1/m]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
 
-subplot(2,4,8); % Pressures
+subplot(3,4,8); % Pressures
 plot(X(1:end-rmv)*1e10, R.Pc(1:end-rmv),'r.-', 'LineWidth',1.5, 'MarkerSize',10); hold on 
 plot(X(1:end-rmv)*1e10, R.Pd(1:end-rmv),'k.-', 'LineWidth',1.5, 'MarkerSize',10);
 xlabel('length along wall (x) [A]'); ylabel('pressure [Pa]')
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded; 
 legend('capillary','disjoining','location','best')
+
+subplot(3,4,9); % mass flow plots
+yyaxis left 
+    plot(X(2:end-rmv)*1e10, R.mflow(2:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10);
+    ylabel('phase change mass flow [kg/s]'); 
+    ylim([min(R.mflow(2:end-rmv)),max(R.mflow(2:end-rmv))]);
+yyaxis right
+    plot(X(1:end-rmv)*1e10, R.G(1:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10);
+    ylabel('liquid mass flow [kg/s]');
+xlabel('length along wall (x) [A]'); 
+set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax.XAxis(1).Exponent=0; %axis padded;
+
+subplot(3,4,10); % liquid pressure gradient
+plot(X(1:end-rmv)*1e10, R.plGrad(1:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
+xlabel('length along wall (x) [A]'); ylabel('liquid pressure grad [Pa/m]');
+set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;
+
+subplot(3,4,11); % disjoining pressure gradient
+plot(X(1:end-rmv)*1e10, R.pdGrad(1:end-rmv),'.-', 'LineWidth',1.5, 'MarkerSize',10, 'MarkerEdgeColor', 'r');
+xlabel('length along wall (x) [A]'); ylabel('disjoining pressure grad [Pa/m]');
+set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0; axis padded;

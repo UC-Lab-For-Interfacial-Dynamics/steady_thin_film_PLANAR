@@ -17,32 +17,39 @@
 function dh = evolution(X, H, step)
 
 %%% Loading previous step data
-    global F C R            % global variables F-fluid data, C-constants, R-reports
-    h  = H(1);              % first derivative
-    h1 = H(2);              % second derivative
-    h2 = H(3);              % third derivative
-    Ti_last = R.Ti(end);    % interface temperature from last full RK step (k4)
-    Tw = C.Tw_func(X);      % wall temperature at the current step
-    Tv = C.Tv_func(X);      % vapor temperature at the current step
+    global F C R                 % global variables F-fluid data, C-constants, R-reports
+    h       = H(1);              % film height
+    h1      = H(2);              % first derivative
+    h2      = H(3);              % second derivative
+    Ti_last = R.Ti(end);         % interface temperature from last full RK step (k4)
+    Tw      = C.Tw_func(X);      % wall temperature at the current step
+    Tv      = C.Tv_func(X);      % vapor temperature at the current step
+    G_last  = R.G(end);          % liquid mass flow at the last spatial step
+    h_last  = R.h(end);          % film height at the last spatial step
+    Pd_last = R.Pd(end);         % disjoining pressure at the last spatial step
 
 %%% Inner loop to solve for interface temperature and mass flux
-    [Ti, mflux] = precondition(h,h1,h2,Tv,Tw);
+    [Ti, mflux] = precondition(h,h1,h2,Tv,Tw, Ti_last);
+    % Ti = Ti_func_MD(X);
+    dA          = C.Lz*sqrt((h_last-h)^2 + C.dx^2); % 
+    mflow       = mflux*dA;
 
 %%% Evolution equation
     % fluid properties
-    [rhov,rhol]            = density(Ti);
+    [rhov,rhol]         = density(Ti);
     Pd                  = disjoinPressure(h);
     mu                  = viscosity(Ti);
     [sigma, gamma]      = surfTension(Ti);
     kappa               = curvature(h1,h2);
     Pc                  = sigma*kappa;
-    a                   = tst_alpha(rhov, rhol);
+    [a,~]               = tst_alpha(rhov, rhol);
 
     % derivatives 
-    dT_dx    = (Ti-Ti_last)/C.dx;                   % temperature gradient
-    dPd_dx   = -3*F.A*h1/h^4;                       % disjoining pressure gradient
-    ds_dx    = gamma*dT_dx;                         % surface tension gradient
-    dPl_dx   = 6*(mflux/h)*(mu/rhol) - 3*h*ds_dx;   % liquid pressure gradient
+    dT_dx    = (Ti-Ti_last)/C.dx;                       % temperature gradient
+    dPd_dx   = (Pd-Pd_last)/C.dx;%-3*F.A*h1/h^4;        % disjoining pressure gradient
+    ds_dx    = gamma*dT_dx;                             % surface tension gradient
+    G        = G_last - mflow;                          % liquid mass flow at the current step
+    dPl_dx   = -(3/h^3)*(G*mu/(rhol*C.Lz) + h^2*ds_dx/2);  % liquid pressure gradient
 
     % film height derviatives from the evolution equation
     dh = nan(3,1); 
@@ -60,10 +67,17 @@ function dh = evolution(X, H, step)
         R.Tw(end+1)        = Tw;
         R.Tv(end+1)        = Tv;
         R.mflux(end+1)     = mflux;
+        R.mflow(end+1)     = mflow;
         R.kappa(end+1)     = kappa;
         R.Pc(end+1)        = Pc;
         R.Pd(end+1)        = Pd;
         R.a(end+1)         = a;
+        R.G(end+1)         = G;
+        R.pdGrad(end+1)    = dPd_dx;
+        R.plGrad(end+1)    = dPl_dx;
+        R.h(end+1)         = h;
+        R.surfArea         = R.surfArea + dA;
+        R.totMflow         = R.totMflow + mflow;
 
         % print progress to command window (if R.print=true)
         if strcmpi(C.debug,'on')    % print film height in debug mode

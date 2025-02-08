@@ -6,5 +6,5 @@
 %       kappa = curvature(h1,h2)
 
 function kappa = curvature(h1,h2)
-    kappa = h2/(1 + h1^2)^(3/2);    % curvature in 2D planar coordinate system 
+    kappa = h2/((1 + h1^2)^(3/2));    % curvature in 2D planar coordinate system 
 end

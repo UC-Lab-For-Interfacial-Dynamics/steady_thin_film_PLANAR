@@ -13,12 +13,10 @@
 %       mflow .............. phase change mass flow [kg/s]
 
 function    mflow = massIntegration(x, h, mflux)
-
-    mflow = nan(size(x));
+global C
+    mflow = 0;
     for i = 1:length(x)-1
-        dx = x(i+1)-x(i);                       % in case of non-uniform solution [m^2]
-        A  = sqrt((h(i)-h(i+1))^2 + dx^2);      % area element  [m^2]
-        mflow(i) = A*mflux(i);
+        dA  = C.Lz*sqrt((h(i)-h(i+1))^2 + C.dx^2);    % area element  [m^2]
+        mflow = mflow + dA*mflux(i);
     end
-    mflow = sum(mflow(1:end-1));
 end
