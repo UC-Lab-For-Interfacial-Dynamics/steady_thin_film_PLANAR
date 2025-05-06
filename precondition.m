@@ -29,6 +29,7 @@ else
 end
 relax = 1e-1;        % relaxation factor for temperature
 maxIter = 1e4;      % max iterations allowed
+minIter = 30;
 
 for i = 1:maxIter    
     %%% fluid properties at the current Ti
@@ -46,8 +47,8 @@ for i = 1:maxIter
     %%% mass flux
     waynerCoeff = (2*a/(2-a))*sqrt(F.M/(2*pi*C.Rc*Ti));
     term1  = waynerCoeff*(Pv_sat*F.M*hfg/(C.Rc*Tv*Ti))*(Ti-Tv); % wayner thermal term
-    term2  = -waynerCoeff*(vl*Pv_sat/(C.Rc*Ti))*(Pd + Pc);       % wayner pressure term
-    mflux  = term1  +  term2;  % mass flux
+    term2  = waynerCoeff*(vl*Pv_sat/(C.Rc*Ti))*(Pd + Pc);       % wayner pressure term
+    mflux  = term1  -  term2;  % mass flux
 
     %%% temperature
     Ti_star = -(hfg/k)*h*mflux + Tw;             % interface temperature
@@ -72,7 +73,7 @@ for i = 1:maxIter
         axis padded; hold on;drawnow();
     end
 
-    if abs(Ti-Ti_star)<1e-4;     break; end     % stopping criterion
+    if abs(Ti-Ti_star)<1e-4 && i>minIter;     break; end     % stopping criterion
     Ti = Ti_new;                                % variable shift for next iteration
     if i==maxIter; error('warning: precondition loop maxed out. increase max iterations.'); end
 end

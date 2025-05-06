@@ -7,7 +7,7 @@
 
 function [sigma, gamma] = surfTension(T)
     global F
-    % sigma = polyval(F.sigma_fit, T);   % uncomment to calculate sigma using NIST curvefit at given temperature(s)
-    sigma = -3.7e-3;                   % [N/m], surf tension from MD data
+    sigma = polyval(F.sigma_fit, T);   % calculate sigma using NIST curvefit at given temperature(s)
+    % sigma = +3.7e-3;                   % [N/m], surf tension from MD data
     gamma = F.sigma_fit(1);            % surface tension gradient
 end

@@ -21,17 +21,17 @@ global F C R            % global data sharing. F-fluid properties, C-constants, 
 C.debug   = 'off';                  % when 'on', plots inner loop iterations & prints ODE solution at every step.
 C.Rc      = 8.31446261815324;       % [J/mol-K],    universal gas constant
 C.Lz      = 3.92e-9;                % depth of MD domain [m]
-C.Tv_func = @Tv_func_MD_centerline; % vapor temperature function handle
-C.Tw_func = @Tw_func_MD;            % wall temperature function handle
+C.Tv_func = @Tv_func_MD_centerline_16; % vapor temperature function handle
+C.Tw_func = @Tw_func_MD_16;            % wall temperature function handle
 
 %%% Boundary Conditions
-h         = 3.958795862223173e-09;  % [m],          film height (currently from MD)
-h1        = -5.3153720543601342;    % [-],          first derivative (currently from MD)
-h2        = 45.2055317858027195e09; % [m^-1],       second derivative (currently from MD)
-R.G       = 2.0646e-14;             % [kg/s],       inlet mass flow rate
+C.x_in    = 0.1e-9;                 % [m],          initial wall distance
+h         = film_16(C.x_in);        % [m],          film height (currently from MD)
+h1        = -6.265107527173289e+00; % [-],          first derivative (currently from MD)
+h2        = 3.192157326161009*1e9;  % [m^-1],       second derivative (currently from MD)
+R.G       = 2.82584020795487e-14;   % [kg/s],       inlet mass flow rate
 IC        = [h,h1,h2];              % [-],          initial conditions vector
-C.x_in    = 0.06e-9;                % [m],          initial wall distance
-C.L       = 2.3e-9;                 % [m],          length of solution
+C.L       = 30e-9;                  % [m],          length of solution
 C.dx      = 1e-12;                  % [m],          step size
 
 %%% Initialize report vectors
@@ -71,7 +71,7 @@ rmv = 2;        % number of points to remove from the end of the solution in the
 
 subplot(3,4,1); % film height
 plot(X(1:end-rmv)*1e10, H(1:end-rmv,1)*1e10, 'r.-', 'LineWidth',1.5, 'markersize',10); hold on;
-plot(X(1:end-rmv)*1e10, film(X(1:end-rmv))*1e10, 'k--', 'LineWidth',1.5);
+plot(X(1:end-rmv)*1e10, film_16(X(1:end-rmv))*1e10, 'k--', 'LineWidth',1.5);
 xlabel('length along wall (x) [A]'); ylabel('film height (h) [A]');
 set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.YAxis(1).Exponent=0; ax.XAxis(1).Exponent=0; axis padded;
 legend('ODE solution','MD','location','best')
@@ -103,7 +103,7 @@ set(gca, 'FontWeight', 'bold', 'fontsize', 14); ax = gca; ax.XAxis(1).Exponent=0
 
 subplot(3,4,6); % interface temperature
 plot(X(1:end-rmv)*1e10, R.Ti(1:end-rmv),'r.-', 'LineWidth',1.5, 'MarkerSize',10); hold on
-plot(X(1:end-rmv)*1e10, Ti_func_MD(X(1:end-rmv)),'r--', 'LineWidth',1);
+plot(X(1:end-rmv)*1e10, Ti_func_MD_16(X(1:end-rmv)),'r--', 'LineWidth',1);
 plot(X(1:end-rmv)*1e10, R.Tw(1:end-rmv),'k.-', 'LineWidth',1.5, 'MarkerSize',10);
 plot(X(1:end-rmv)*1e10, R.Tv(1:end-rmv),'b.-', 'LineWidth',1.5, 'MarkerSize',10);
 legend('interface','interface MD','wall','vapor','Location','best')
